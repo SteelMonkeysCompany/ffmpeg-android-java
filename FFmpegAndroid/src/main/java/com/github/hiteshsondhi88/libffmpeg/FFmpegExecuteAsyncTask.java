@@ -142,7 +142,9 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
                 readed = stream.read(buf, 0, buf.length);
                 if (readed > 0) {
                     totalReaded += readed;
-                    publishProgress(buf, readed);
+                    byte[] bufCopy = new byte[readed];
+                    System.arraycopy(buf, 0, bufCopy, 0, readed);
+                    publishProgress(bufCopy, readed);
                     //fs.Write(buf, 0, readed);
                 }
             } catch (Exception e) {
