@@ -13,6 +13,11 @@ public class ExecuteBinaryResponseHandler implements FFmpegExecuteResponseHandle
     }
 
     @Override
+    public void onProgress(byte[] data, int size) {
+
+    }
+
+    @Override
     public void onFailure(String message) {
 
     }

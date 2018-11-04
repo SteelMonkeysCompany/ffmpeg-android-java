@@ -4,10 +4,11 @@ import android.os.AsyncTask;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeoutException;
 
-class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResult> {
+class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
 
     private final String[] cmd;
     private final FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler;
@@ -40,7 +41,12 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResult> {
                 return CommandResult.getDummyFailureResponse();
             }
             Log.d("Running publishing updates method");
-            checkAndUpdateProcess();
+            boolean pipe = cmd[cmd.length - 1].startsWith("pipe:");
+            if (pipe) {
+                checkAndUpdateProcessBinary();
+            } else {
+                checkAndUpdateProcess();
+            }
             return CommandResult.getOutputFromProcess(process);
         } catch (TimeoutException e) {
             Log.e("FFmpeg timed out", e);
@@ -54,9 +60,13 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResult> {
     }
 
     @Override
-    protected void onProgressUpdate(String... values) {
+    protected void onProgressUpdate(Object... values) {
         if (values != null && values[0] != null && ffmpegExecuteResponseHandler != null) {
-            ffmpegExecuteResponseHandler.onProgress(values[0]);
+            if (values[0] instanceof String) {
+                ffmpegExecuteResponseHandler.onProgress((String)values[0]);
+            } else {
+                ffmpegExecuteResponseHandler.onProgress((byte[])values[0], (int)values[1]);
+            }
         }
     }
 
@@ -104,6 +114,42 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, String, CommandResult> {
 
     boolean isProcessCompleted() {
         return Util.isProcessCompleted(process);
+    }
+
+    private void checkAndUpdateProcessBinary() {
+        int totalReaded = 0;
+        byte[] buf = new byte[64 * 1024];
+        InputStream stream = process.getInputStream();
+        while (!Util.isProcessCompleted(process)) {
+            //Thread.sleep(1);
+            totalReaded += readStream(buf, stream);
+        }
+        try {
+            process.waitFor();
+        } catch (InterruptedException e) {
+            Log.e("Interrupted exception ", e);
+        }
+        totalReaded += readStream(buf, stream);
+        publishProgress("Binary totalReaded " + totalReaded);
+    }
+
+    private int readStream(byte[] buf, InputStream stream)
+    {
+        int totalReaded = 0;
+        int readed = 0;
+        do {
+            try {
+                readed = stream.read(buf, 0, buf.length);
+                if (readed > 0) {
+                    totalReaded += readed;
+                    publishProgress(buf, readed);
+                    //fs.Write(buf, 0, readed);
+                }
+            } catch (Exception e) {
+                Log.e(" stream.read exception!!", e);
+            }
+        } while (readed == buf.length);
+        return totalReaded;
     }
 
 }

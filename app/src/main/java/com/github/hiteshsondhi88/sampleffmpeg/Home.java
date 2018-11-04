@@ -96,6 +96,13 @@ public class Home extends Activity implements View.OnClickListener {
                 }
 
                 @Override
+                public void onProgress(byte[] data, int size) {
+                    Log.d(TAG, "Started command : ffmpeg "+command);
+                    addTextViewToLayout("progress : size of data "+ size);
+                    progressDialog.setMessage("Processing\nsize of data "+ size);
+                }
+
+                @Override
                 public void onStart() {
                     outputLayout.removeAllViews();
 
