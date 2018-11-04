@@ -15,6 +15,13 @@ public interface FFmpegExecuteResponseHandler extends ResponseHandler {
     public void onProgress(String message);
 
     /**
+     * on Progress
+     * @param data current binary standard output of FFmpeg command
+     * @param size size of fillled data
+     */
+    public void onProgress(byte[] data, int size);
+
+    /**
      * on Failure
      * @param message complete output of the FFmpeg command
      */

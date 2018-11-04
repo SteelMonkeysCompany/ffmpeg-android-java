@@ -150,6 +150,9 @@ public class FFmpegInstrumentationTest extends ActivityInstrumentationTestCase2<
                 }
 
                 @Override
+                public void onProgress(byte[] data, int size) { Log.d(TAG, "progress : size of data "+ size); }
+
+                @Override
                 public void onFailure(String message) {
                     assertTrue(false);
                 }
