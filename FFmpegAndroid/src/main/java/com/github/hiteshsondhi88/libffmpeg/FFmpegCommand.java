@@ -4,8 +4,8 @@ import java.util.Map;
 
 public class FFmpegCommand
 {
-    public class SyncObject {
-        public boolean Pause = false;
+    public static class SyncObject {
+        public boolean pause = false;
     }
     public static int PIPE_BUFFER_SIZE = 64 * 1024;
 
