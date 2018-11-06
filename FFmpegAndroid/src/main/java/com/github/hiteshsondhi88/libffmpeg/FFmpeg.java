@@ -4,7 +4,6 @@ import android.content.Context;
 import android.text.TextUtils;
 
 import java.lang.reflect.Array;
-import java.util.Map;
 
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedException;
@@ -17,7 +16,6 @@ public class FFmpeg implements FFmpegInterface {
     private FFmpegLoadLibraryAsyncTask ffmpegLoadLibraryAsyncTask;
 
     private static final long MINIMUM_TIMEOUT = 10 * 1000;
-    private long timeout = Long.MAX_VALUE;
 
     private static FFmpeg instance = null;
 
@@ -58,14 +56,14 @@ public class FFmpeg implements FFmpegInterface {
     }
 
     @Override
-    public void execute(Map<String, String> environvenmentVars, String[] cmd, FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler) throws FFmpegCommandAlreadyRunningException {
+    public void execute(FFmpegCommand command) throws FFmpegCommandAlreadyRunningException {
         if (ffmpegExecuteAsyncTask != null && !ffmpegExecuteAsyncTask.isProcessCompleted()) {
             throw new FFmpegCommandAlreadyRunningException("FFmpeg command is already running, you are only allowed to run single command at a time");
         }
-        if (cmd.length != 0) {
-            String[] ffmpegBinary = new String[] { FileUtils.getFFmpeg(context, environvenmentVars) };
-            String[] command = concatenate(ffmpegBinary, cmd);
-            ffmpegExecuteAsyncTask = new FFmpegExecuteAsyncTask(command , timeout, ffmpegExecuteResponseHandler);
+        if (command.cmdArgs.length != 0) {
+            String[] ffmpegBinary = new String[] { FileUtils.getFFmpeg(context, command.environvenmentVars) };
+            command.cmd = concatenate(ffmpegBinary, command.cmdArgs);
+            ffmpegExecuteAsyncTask = new FFmpegExecuteAsyncTask(command);
             ffmpegExecuteAsyncTask.execute();
         } else {
             throw new IllegalArgumentException("shell command cannot be empty");
@@ -82,11 +80,6 @@ public class FFmpeg implements FFmpegInterface {
         System.arraycopy(b, 0, c, aLen, bLen);
 
         return c;
-    }
-
-    @Override
-    public void execute(String[] cmd, FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler) throws FFmpegCommandAlreadyRunningException {
-        execute(null, cmd, ffmpegExecuteResponseHandler);
     }
 
     @Override
@@ -113,12 +106,5 @@ public class FFmpeg implements FFmpegInterface {
     @Override
     public boolean killRunningProcesses() {
         return Util.killAsync(ffmpegLoadLibraryAsyncTask) || Util.killAsync(ffmpegExecuteAsyncTask);
-    }
-
-    @Override
-    public void setTimeout(long timeout) {
-        if (timeout >= MINIMUM_TIMEOUT) {
-            this.timeout = timeout;
-        }
     }
 }

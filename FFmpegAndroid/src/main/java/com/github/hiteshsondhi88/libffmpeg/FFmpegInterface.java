@@ -1,7 +1,5 @@
 package com.github.hiteshsondhi88.libffmpeg;
 
-import java.util.Map;
-
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedException;
 
@@ -17,20 +15,10 @@ interface FFmpegInterface {
 
     /**
      * Executes a command
-     * @param environvenmentVars Environment variables
-     * @param cmd command to execute
-     * @param ffmpegExecuteResponseHandler {@link FFmpegExecuteResponseHandler}
+     * @param command
      * @throws FFmpegCommandAlreadyRunningException
      */
-    public void execute(Map<String, String> environvenmentVars, String[] cmd, FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler) throws FFmpegCommandAlreadyRunningException;
-
-    /**
-     * Executes a command
-     * @param cmd command to execute
-     * @param ffmpegExecuteResponseHandler {@link FFmpegExecuteResponseHandler}
-     * @throws FFmpegCommandAlreadyRunningException
-     */
-    public void execute(String[] cmd, FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler) throws FFmpegCommandAlreadyRunningException;
+    public void execute(FFmpegCommand command) throws FFmpegCommandAlreadyRunningException;
 
     /**
      * Tells FFmpeg version currently on device
@@ -56,11 +44,5 @@ interface FFmpegInterface {
      * @return true if process is killed successfully
      */
     public boolean killRunningProcesses();
-
-    /**
-     * Timeout for FFmpeg process, should be minimum of 10 seconds
-     * @param timeout in milliseconds
-     */
-    public void setTimeout(long timeout);
 
 }
