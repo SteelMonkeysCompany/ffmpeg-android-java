@@ -147,7 +147,7 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
         int readed = 0;
         do {
             try {
-                if (!forceReadToEnd && command.pipeSyncObject != null && command.pipeSyncObject.Pause)
+                if (!forceReadToEnd && command.pipeSyncObject != null && command.pipeSyncObject.pause)
                 {
                     return totalReaded;
                 }
