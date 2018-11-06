@@ -10,38 +10,37 @@ import java.util.concurrent.TimeoutException;
 
 class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
 
-    private final String[] cmd;
-    private final FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler;
     private final ShellCommand shellCommand;
-    private final long timeout;
     private long startTime;
     private Process process;
     private String output = "";
 
-    FFmpegExecuteAsyncTask(String[] cmd, long timeout, FFmpegExecuteResponseHandler ffmpegExecuteResponseHandler) {
-        this.cmd = cmd;
-        this.timeout = timeout;
-        this.ffmpegExecuteResponseHandler = ffmpegExecuteResponseHandler;
+    // Used for piping
+    private int bufReaded = 0;
+    private FFmpegCommand command;
+
+    FFmpegExecuteAsyncTask(FFmpegCommand command) {
+        this.command = command;
         this.shellCommand = new ShellCommand();
     }
 
     @Override
     protected void onPreExecute() {
         startTime = System.currentTimeMillis();
-        if (ffmpegExecuteResponseHandler != null) {
-            ffmpegExecuteResponseHandler.onStart();
+        if (command.ffmpegExecuteResponseHandler != null) {
+            command.ffmpegExecuteResponseHandler.onStart();
         }
     }
 
     @Override
     protected CommandResult doInBackground(Void... params) {
         try {
-            process = shellCommand.run(cmd);
+            process = shellCommand.run(command.cmd);
             if (process == null) {
                 return CommandResult.getDummyFailureResponse();
             }
             Log.d("Running publishing updates method");
-            boolean pipe = cmd[cmd.length - 1].startsWith("pipe:");
+            boolean pipe = command.cmd[command.cmd.length - 1].startsWith("pipe:");
             if (pipe) {
                 checkAndUpdateProcessBinary();
             } else {
@@ -61,25 +60,25 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
 
     @Override
     protected void onProgressUpdate(Object... values) {
-        if (values != null && values[0] != null && ffmpegExecuteResponseHandler != null) {
+        if (values != null && values[0] != null && command.ffmpegExecuteResponseHandler != null) {
             if (values[0] instanceof String) {
-                ffmpegExecuteResponseHandler.onProgress((String)values[0]);
+                command.ffmpegExecuteResponseHandler.onProgress((String)values[0]);
             } else {
-                ffmpegExecuteResponseHandler.onProgress((byte[])values[0], (int)values[1]);
+                command.ffmpegExecuteResponseHandler.onProgress((byte[])values[0]);
             }
         }
     }
 
     @Override
     protected void onPostExecute(CommandResult commandResult) {
-        if (ffmpegExecuteResponseHandler != null) {
+        if (command.ffmpegExecuteResponseHandler != null) {
             output += commandResult.output;
             if (commandResult.success) {
-                ffmpegExecuteResponseHandler.onSuccess(output);
+                command.ffmpegExecuteResponseHandler.onSuccess(output);
             } else {
-                ffmpegExecuteResponseHandler.onFailure(output);
+                command.ffmpegExecuteResponseHandler.onFailure(output);
             }
-            ffmpegExecuteResponseHandler.onFinish();
+            command.ffmpegExecuteResponseHandler.onFinish();
         }
     }
 
@@ -91,7 +90,7 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
             }
 
             // Handling timeout
-            if (timeout != Long.MAX_VALUE && System.currentTimeMillis() > startTime + timeout) {
+            if (command.timeout != Long.MAX_VALUE && System.currentTimeMillis() > startTime + command.timeout) {
                 throw new TimeoutException("FFmpeg timed out");
             }
 
@@ -118,39 +117,57 @@ class FFmpegExecuteAsyncTask extends AsyncTask<Void, Object, CommandResult> {
 
     private void checkAndUpdateProcessBinary() {
         int totalReaded = 0;
-        byte[] buf = new byte[64 * 1024];
+        byte[] buf = new byte[command.pipeSizeForPublishProgress];
         InputStream stream = process.getInputStream();
         while (!Util.isProcessCompleted(process)) {
             //Thread.sleep(1);
-            totalReaded += readStream(buf, stream);
+            totalReaded += readStream(buf, stream, false);
         }
         try {
             process.waitFor();
         } catch (InterruptedException e) {
             Log.e("Interrupted exception ", e);
         }
-        totalReaded += readStream(buf, stream);
+        totalReaded += readStream(buf, stream, true);
+        if (bufReaded > 0)
+        {
+            Log.w("_pipeSizeForPublishProgress (" + command.pipeSizeForPublishProgress  + ") has incorrect values? Tail size is " + bufReaded);
+            byte[] newBuf = new byte[bufReaded];
+            System.arraycopy(buf, 0, newBuf, 0, bufReaded);
+            buf = newBuf;
+            publishProgress(buf);
+        }
         publishProgress("Binary totalReaded " + totalReaded);
     }
 
-    private int readStream(byte[] buf, InputStream stream)
+    private int readStream(byte[] buf, InputStream stream, boolean forceReadToEnd)
     {
+         int toRead = 0;
         int totalReaded = 0;
         int readed = 0;
         do {
             try {
-                readed = stream.read(buf, 0, buf.length);
+                if (!forceReadToEnd && command.pipeSyncObject != null && command.pipeSyncObject.Pause)
+                {
+                    return totalReaded;
+                }
+
+                toRead = Math.min(command.pipeBufferSize, command.pipeSizeForPublishProgress - bufReaded);
+                readed = stream.read(buf, bufReaded, toRead);
                 if (readed > 0) {
                     totalReaded += readed;
-                    byte[] bufCopy = new byte[readed];
-                    System.arraycopy(buf, 0, bufCopy, 0, readed);
-                    publishProgress(bufCopy, readed);
-                    //fs.Write(buf, 0, readed);
+                    bufReaded += readed;
+                    if (bufReaded == command.pipeSizeForPublishProgress)
+                    {
+                        publishProgress(buf, bufReaded);
+                        buf = new byte[command.pipeSizeForPublishProgress];
+                        bufReaded = 0;
+                    }
                 }
             } catch (Exception e) {
                 Log.e(" stream.read exception!!", e);
             }
-        } while (readed == buf.length);
+        } while (readed == toRead);
         return totalReaded;
     }
 

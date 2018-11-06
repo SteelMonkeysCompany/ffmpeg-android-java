@@ -9,6 +9,7 @@ import java.io.File;
 import javax.inject.Inject;
 
 import com.github.hiteshsondhi88.libffmpeg.FFmpeg;
+import com.github.hiteshsondhi88.libffmpeg.FFmpegCommand;
 import com.github.hiteshsondhi88.libffmpeg.FFmpegExecuteResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.FFmpegLoadBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
@@ -137,7 +138,9 @@ public class FFmpegInstrumentationTest extends ActivityInstrumentationTestCase2<
     private void checkFFmpegCommon(final String cmd, final File outputFile) {
         Log.d(TAG, "start : "+outputFile.getAbsolutePath());
         try {
-            ffmpeg.execute(cmd, new FFmpegExecuteResponseHandler() {
+            FFmpegCommand command = new FFmpegCommand();
+            command.cmdArgs = cmd.split(" ");
+            command.ffmpegExecuteResponseHandler = new FFmpegExecuteResponseHandler() {
 
                 @Override
                 public void onStart() {
@@ -169,7 +172,8 @@ public class FFmpegInstrumentationTest extends ActivityInstrumentationTestCase2<
                         FFmpegInstrumentationTest.this.notify();
                     }
                 }
-            });
+            };
+            ffmpeg.execute(command);
         } catch (Exception e) {
             assertTrue(false);
         }

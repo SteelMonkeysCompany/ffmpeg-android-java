@@ -3,9 +3,9 @@ package com.github.hiteshsondhi88.sampleffmpeg;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -22,9 +22,13 @@ import dagger.ObjectGraph;
 
 import com.github.hiteshsondhi88.libffmpeg.ExecuteBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.FFmpeg;
+import com.github.hiteshsondhi88.libffmpeg.FFmpegCommand;
 import com.github.hiteshsondhi88.libffmpeg.LoadBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedException;
+
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class Home extends Activity implements View.OnClickListener {
 
@@ -75,9 +79,15 @@ public class Home extends Activity implements View.OnClickListener {
         }
     }
 
-    private void execFFmpegBinary(final String[] command) {
+    private void execFFmpegBinary(final FFmpegCommand command) {
         try {
-            ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
+            final Activity activity = this;
+
+            // HACK: pipeSizeForPublishProgress is hardcoded for bmp 4k
+            command.pipeSizeForPublishProgress = 25165878;
+            command.ffmpegExecuteResponseHandler = new ExecuteBinaryResponseHandler() {
+                int counter = 0;
+
                 @Override
                 public void onFailure(String s) {
                     addTextViewToLayout("FAILED with output : "+s);
@@ -90,33 +100,45 @@ public class Home extends Activity implements View.OnClickListener {
 
                 @Override
                 public void onProgress(String s) {
-                    Log.d(TAG, "Started command : ffmpeg "+command);
+                    Log.d(TAG, "Started command : ffmpeg "+command.cmdArgs);
                     addTextViewToLayout("progress : "+s);
                     progressDialog.setMessage("Processing\n"+s);
                 }
 
                 @Override
-                public void onProgress(byte[] data, int size) {
-                    Log.d(TAG, "Started command : ffmpeg "+command);
-                    addTextViewToLayout("progress : size of data "+ size);
-                    progressDialog.setMessage("Processing\nsize of data "+ size);
+                public void onProgress(byte[] data) {
+                    Log.d(TAG, "Started command : ffmpeg "+command.cmdArgs);
+                    addTextViewToLayout("progress : size of data "+ data.length);
+
+                    progressDialog.setMessage("Processing\nsize of data "+ data.length);
+                    try {
+                        ++counter;
+                        String path = String.valueOf(activity.getExternalFilesDir("")) + "/home_" + counter + ".bmp";
+                        FileOutputStream stream = new FileOutputStream(path);
+                        stream.write(data);
+                        stream.close();
+                        Log.i(TAG, "Success save to " + path);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 @Override
                 public void onStart() {
                     outputLayout.removeAllViews();
 
-                    Log.d(TAG, "Started command : ffmpeg " + command);
+                    Log.d(TAG, "Started command : ffmpeg " + command.cmdArgs);
                     progressDialog.setMessage("Processing...");
                     progressDialog.show();
                 }
 
                 @Override
                 public void onFinish() {
-                    Log.d(TAG, "Finished command : ffmpeg "+command);
+                    Log.d(TAG, "Finished command : ffmpeg "+command.cmdArgs);
                     progressDialog.dismiss();
                 }
-            });
+            };
+            ffmpeg.execute(command);
         } catch (FFmpegCommandAlreadyRunningException e) {
             // do nothing for now
         }
@@ -152,7 +174,9 @@ public class Home extends Activity implements View.OnClickListener {
                 String cmd = commandEditText.getText().toString();
                 String[] command = cmd.split(" ");
                 if (command.length != 0) {
-                    execFFmpegBinary(command);
+                    FFmpegCommand ffmpegCommand = new FFmpegCommand();
+                    ffmpegCommand.cmdArgs = command;
+                    execFFmpegBinary(ffmpegCommand);
                 } else {
                     Toast.makeText(Home.this, getString(R.string.empty_command_toast), Toast.LENGTH_LONG).show();
                 }
